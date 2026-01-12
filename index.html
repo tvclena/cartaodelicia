@@ -36,8 +36,10 @@ body{margin:0;background:#f4f6f8;color:#111}
 .login button{
   width:100%;padding:14px;border:none;
   border-radius:14px;background:#ff6a00;
-  color:#fff;font-weight:800
+  color:#fff;font-weight:800;
+  opacity:.6
 }
+.login button.enabled{opacity:1}
 
 /* HEADER */
 .header{padding:24px 20px 12px;font-size:28px;font-weight:800}
@@ -142,16 +144,16 @@ body{margin:0;background:#f4f6f8;color:#111}
 
 <script>
 const sb = window.supabase.createClient(
-  'https://egdjqcxikorbivkbdeap.supabase.co',
-  'sb_publishable_Fy2crcrzYe2aYH9uOffyZQ_kJozEk3A'
+  "https://egdjqcxikorbivkbdeap.supabase.co",
+  "sb_publishable_Fy2crcrzYe2aYH9uOffyZQ_kJozEk3A"
 );
 
 const clienteId = new URLSearchParams(location.search).get("c");
-const senhaKey = "senha_"+clienteId;
+const senhaKey = "senha_" + clienteId;
 
-let dadosCache = null;
+let clienteCache = null;
 
-/* PRÉ-CARREGAMENTO */
+/* PRELOAD SEGURO */
 (async ()=>{
   const { data, error } = await sb
     .from("clientes")
@@ -159,21 +161,30 @@ let dadosCache = null;
       id,nome,telefone,saldo_cashback,senha_resgate,
       empresas(nome)
     `)
-    .eq("id",clienteId)
+    .eq("id", clienteId)
     .single();
 
-  if(error){ alert("Cliente não encontrado"); return; }
-  dadosCache = data;
+  if(error || !data){
+    loader.innerText = "Cliente não encontrado";
+    return;
+  }
+
+  clienteCache = data;
   loader.classList.add("hidden");
+  btnEntrar.classList.add("enabled");
 })();
 
 /* LOGIN */
-btnEntrar.onclick = async ()=>{
+btnEntrar.onclick = ()=>{
+  if(!clienteCache) return;
+
   if(!localStorage.getItem(senhaKey)){
     localStorage.setItem(senhaKey, senhaInput.value);
-  }else if(localStorage.getItem(senhaKey)!==senhaInput.value){
-    alert("Senha incorreta"); return;
+  }else if(localStorage.getItem(senhaKey) !== senhaInput.value){
+    alert("Senha incorreta");
+    return;
   }
+
   login.style.display="none";
   render();
 };
@@ -183,33 +194,33 @@ flipBtn.onclick = ()=>card.classList.toggle("flipped");
 
 /* RENDER */
 async function render(){
-  const cliente = dadosCache;
+  const c = clienteCache;
 
-  headerNome.innerText = `Olá, ${cliente.nome}!`;
-  dadosCliente.innerHTML = `${cliente.nome}<br>${cliente.telefone}`;
-  empresa.innerText = cliente.empresas.nome;
-  empresaBack.innerText = cliente.empresas.nome;
-  empresaLista.innerText = cliente.empresas.nome;
-  senhaResgate.innerText = cliente.senha_resgate;
-  saldo.innerText = `R$ ${cliente.saldo_cashback.toFixed(2)}`;
+  headerNome.innerText = `Olá, ${c.nome}!`;
+  dadosCliente.innerHTML = `${c.nome}<br>${c.telefone}`;
+  empresa.innerText = c.empresas.nome;
+  empresaBack.innerText = c.empresas.nome;
+  empresaLista.innerText = c.empresas.nome;
+  senhaResgate.innerText = c.senha_resgate;
+  saldo.innerText = `R$ ${Number(c.saldo_cashback).toFixed(2)}`;
 
-  const [cartaoRes, movsRes] = await Promise.all([
-    sb.from("cartoes").select("numero_cartao").eq("cliente_id",clienteId).single(),
+  const [cartao, movs] = await Promise.all([
+    sb.from("cartoes").select("numero_cartao").eq("cliente_id",c.id).single(),
     sb.from("movimentacoes_cashback")
       .select("descricao,tipo,valor")
-      .eq("cliente_id",clienteId)
+      .eq("cliente_id",c.id)
       .order("created_at",{ascending:false})
   ]);
 
-  numeroCartao.innerText = cartaoRes.data?.numero_cartao || "";
+  numeroCartao.innerText = cartao.data?.numero_cartao || "";
 
-  extrato.innerHTML="<h3>Extrato</h3>";
-  movsRes.data.forEach(m=>{
-    extrato.innerHTML+=`
+  extrato.innerHTML = "<h3>Extrato</h3>";
+  movs.data.forEach(m=>{
+    extrato.innerHTML += `
       <div class="mov">
         ${m.descricao}<br>
         <span class="${m.tipo}">
-          ${m.tipo==="entrada"?"+":"-"} R$ ${m.valor.toFixed(2)}
+          ${m.tipo==="entrada"?"+":"-"} R$ ${Number(m.valor).toFixed(2)}
         </span>
       </div>`;
   });
