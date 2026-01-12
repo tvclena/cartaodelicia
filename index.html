@@ -34,12 +34,12 @@ body{margin:0;background:#f4f6f8;color:#111}
 /* HEADER */
 .header{padding:24px 20px 12px;font-size:28px;font-weight:800}
 
-/* CARD FLIP */
+/* CARD */
 .card-wrapper{perspective:1200px;padding:0 16px}
 .card{width:100%;height:170px;border-radius:18px;position:relative;transform-style:preserve-3d;transition:.6s}
 .card.flipped{transform:rotateY(180deg)}
 .card-face{
-  position:absolute;width:100%;height:100%;backface-visibility:hidden;
+  position:absolute;inset:0;backface-visibility:hidden;
   border-radius:18px;background:#0b0f14;color:#fff;
   padding:18px;border:2px solid #ff2a00
 }
@@ -66,8 +66,7 @@ body{margin:0;background:#f4f6f8;color:#111}
   background:#fff;margin:16px;border-radius:14px;
   padding:18px;text-align:center
 }
-.balance small{color:#666}
-.balance strong{display:block;font-size:34px;margin-top:6px}
+.balance strong{font-size:34px}
 
 /* LISTA */
 .list{padding:8px 16px 30px}
@@ -78,8 +77,6 @@ body{margin:0;background:#f4f6f8;color:#111}
 }
 .item .left{display:flex;gap:12px;align-items:center}
 .item i{font-size:26px}
-.item .text strong{display:block}
-.item .text small{color:#666}
 
 /* EXTRATO */
 .extrato{padding:0 16px 30px}
@@ -113,9 +110,7 @@ body{margin:0;background:#f4f6f8;color:#111}
       </div>
       <div class="number" id="numeroCartao"></div>
       <div class="name" id="dadosCliente"></div>
-      <div class="arrow" id="flipBtn">
-        <i class="ri-arrow-right-s-line"></i>
-      </div>
+      <div class="arrow" id="flipBtn"><i class="ri-arrow-right-s-line"></i></div>
     </div>
 
     <div class="card-face card-back">
@@ -125,23 +120,20 @@ body{margin:0;background:#f4f6f8;color:#111}
   </div>
 </div>
 
-<!-- SALDO -->
 <div class="balance">
   <small>Saldo em Cashback</small>
   <strong id="saldo"></strong>
 </div>
 
-<!-- LISTA -->
 <div class="list">
-  <div class="item"><div class="left"><i class="ri-store-2-fill"></i><div class="text"><strong id="empresaLista"></strong><small>Contato, endereço, redes sociais</small></div></div><i class="ri-arrow-right-s-line"></i></div>
-  <div class="item"><div class="left"><i class="ri-qr-code-fill"></i><div class="text"><strong>QrCode</strong><small>Mostre no estabelecimento</small></div></div><i class="ri-arrow-right-s-line"></i></div>
-  <div class="item"><div class="left"><i class="ri-file-list-3-fill"></i><div class="text"><strong>Extrato</strong><small>Últimas movimentações</small></div></div><i class="ri-arrow-right-s-line"></i></div>
+  <div class="item"><div class="left"><i class="ri-store-2-fill"></i><strong id="empresaLista"></strong></div><i class="ri-arrow-right-s-line"></i></div>
+  <div class="item"><div class="left"><i class="ri-qr-code-fill"></i>QrCode</div><i class="ri-arrow-right-s-line"></i></div>
+  <div class="item"><div class="left"><i class="ri-file-list-3-fill"></i>Extrato</div><i class="ri-arrow-right-s-line"></i></div>
 </div>
 
 <div class="extrato" id="extrato"></div>
 
 <script>
-/* 🔧 SUPABASE – SEM CONFLITO */
 const sb = window.supabase.createClient(
   'https://egdjqcxikorbivkbdeap.supabase.co',
   'sb_publishable_Fy2crcrzYe2aYH9uOffyZQ_kJozEk3A'
@@ -150,29 +142,31 @@ const sb = window.supabase.createClient(
 const clienteId = new URLSearchParams(location.search).get("c");
 const senhaKey = "senha_" + clienteId;
 
-/* LOGIN */
-document.getElementById("btnEntrar").addEventListener("click", () => {
-  const senha = senhaInput.value;
+btnEntrar.onclick = () => {
   if(!localStorage.getItem(senhaKey)){
-    localStorage.setItem(senhaKey, senha);
-  }else if(localStorage.getItem(senhaKey) !== senha){
-    alert("Senha incorreta");
-    return;
+    localStorage.setItem(senhaKey, senhaInput.value);
+  }else if(localStorage.getItem(senhaKey)!==senhaInput.value){
+    alert("Senha incorreta"); return;
   }
-  login.style.display = "none";
+  login.style.display="none";
   carregarDados();
-});
+};
 
-/* FLIP */
-flipBtn.addEventListener("click", () => {
-  card.classList.toggle("flipped");
-});
+flipBtn.onclick = ()=>card.classList.toggle("flipped");
 
-/* DADOS */
 async function carregarDados(){
   const { data:cliente, error } = await sb
     .from("clientes")
-    .select("*, empresas(nome)")
+    .select(`
+      id,
+      nome,
+      telefone,
+      saldo_cashback,
+      senha_resgate,
+      empresas (
+        nome
+      )
+    `)
     .eq("id", clienteId)
     .single();
 
@@ -196,13 +190,13 @@ async function carregarDados(){
 
   const { data:movs } = await sb
     .from("movimentacoes_cashback")
-    .select("*")
+    .select("descricao, tipo, valor")
     .eq("cliente_id", clienteId)
-    .order("created_at", { ascending:false });
+    .order("created_at",{ascending:false});
 
-  extrato.innerHTML = "<h3>Extrato</h3>";
-  movs.forEach(m => {
-    extrato.innerHTML += `
+  extrato.innerHTML="<h3>Extrato</h3>";
+  movs.forEach(m=>{
+    extrato.innerHTML+=`
       <div class="mov">
         ${m.descricao}<br>
         <span class="${m.tipo}">
