@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Painel Admin</title>
+
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#ff6a00">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Inter;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;background:#f5f7fb;overflow:hidden}
+
+:root{
+  --primary:#ff6a00;
+  --card:#fff;
+  --border:#e6e8ef;
+  --text:#111827;
+  --muted:#6b7280;
+}
+
+/* HEADER */
+.header{
+  padding:14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.header h1{font-size:17px;font-weight:800}
+.header p{font-size:11px;color:var(--muted)}
+
+/* GRID */
+.grid{
+  padding:12px 12px env(safe-area-inset-bottom);
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  overflow-y:auto;
+}
+
+/* CARD */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  aspect-ratio:1/1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  font-weight:800;
+  font-size:11px;
+}
+.card:active{transform:scale(.95)}
+
+/* POPUP */
+.popup{
+  position:fixed;
+  inset:0;
+  background:#000000aa;
+  display:none;
+  z-index:9999;
+}
+.popup .box{
+  background:#fff;
+  margin:20px;
+  border-radius:18px;
+  padding:16px;
+}
+.popup h2{font-size:16px;margin-bottom:12px}
+.popup input{
+  width:100%;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  margin-bottom:10px;
+}
+.popup button{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:14px;
+  background:var(--primary);
+  color:#fff;
+  font-weight:800;
+}
+.close{
+  margin-top:10px;
+  text-align:center;
+  font-size:12px;
+  color:#666;
+}
+</style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <h1>Painel Admin</h1>
+    <p>Cashback & Clientes</p>
+  </div>
+</div>
+
+<!-- GRID -->
+<div class="grid">
+
+  <div class="card" onclick="abrirCadastro()">👤<br>Cadastrar Cliente</div>
+  <div class="card">💰<br>Adicionar Saldo</div>
+  <div class="card">🔁<br>Resgatar</div>
+  <div class="card">📄<br>Extratos</div>
+  <div class="card">🏢<br>Empresas</div>
+  <div class="card">⚙️<br>Config</div>
+
+</div>
+
+<!-- POPUP CADASTRO -->
+<div class="popup" id="popup">
+  <div class="box">
+    <h2>Novo Cliente</h2>
+
+    <input id="nome" placeholder="Nome do cliente">
+    <input id="telefone" placeholder="WhatsApp (DDD + número)">
+    <input id="saldo" placeholder="Saldo inicial" type="number">
+
+    <button onclick="cadastrar()">Cadastrar & Enviar</button>
+    <div class="close" onclick="fechar()">Cancelar</div>
+  </div>
+</div>
+
+<script>
+/* SUPABASE */
+const sb = supabase.createClient(
+  "https://egdjqcxikorbivkbdeap.supabase.co",
+  "sb_publishable_Fy2crcrzYe2aYH9uOffyZQ_kJozEk3A"
+);
+
+/* POPUP */
+function abrirCadastro(){ popup.style.display="block" }
+function fechar(){ popup.style.display="none" }
+
+/* CADASTRAR CLIENTE */
+async function cadastrar(){
+  const nome = nomeInput.value;
+  const telefone = telefoneInput.value.replace(/\D/g,'');
+  const saldo = parseFloat(saldoInput.value);
+
+  if(!nome || !telefone || !saldo){
+    alert("Preencha tudo");
+    return;
+  }
+
+  // cria cliente
+  const { data:cliente, error } = await sb
+    .from("clientes")
+    .insert({
+      nome,
+      telefone,
+      saldo_cashback: saldo,
+      senha_resgate: Math.floor(100+Math.random()*900).toString()
+    })
+    .select()
+    .single();
+
+  if(error){
+    alert("Erro ao cadastrar");
+    return;
+  }
+
+  // movimentação
+  await sb.from("movimentacoes_cashback").insert({
+    cliente_id: cliente.id,
+    tipo: "entrada",
+    descricao: "Crédito inicial",
+    valor: saldo,
+    saldo_apos: saldo
+  });
+
+  const linkCarteira = `https://SEUSITE.com/carteira.html?c=${cliente.id}`;
+
+  const msg = encodeURIComponent(
+`🎉 Parabéns, ${nome}!
+
+Você recebeu R$ ${saldo.toFixed(2)} em cashback no Delícia Gourmet Club 💳
+
+👉 Acesse sua carteira digital:
+${linkCarteira}
+
+Aproveite! 😄`
+  );
+
+  window.open(`https://wa.me/55${telefone}?text=${msg}`, "_blank");
+
+  fechar();
+}
+</script>
+
+</body>
+</html>
