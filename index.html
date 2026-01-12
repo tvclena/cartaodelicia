@@ -97,8 +97,8 @@ body{margin:0;background:#f4f6f8;color:#111}
 <!-- LOGIN -->
 <div class="login" id="login">
   <h2>Acessar Carteira</h2>
-  <input id="senha" type="password" placeholder="Crie ou informe sua senha">
-  <button onclick="entrar()">Entrar</button>
+  <input id="senhaInput" type="password" placeholder="Digite sua senha">
+  <button id="btnEntrar">Entrar</button>
 </div>
 
 <div class="header" id="headerNome">Olá!</div>
@@ -113,7 +113,7 @@ body{margin:0;background:#f4f6f8;color:#111}
       </div>
       <div class="number" id="numeroCartao"></div>
       <div class="name" id="dadosCliente"></div>
-      <div class="arrow" onclick="flipCard()">
+      <div class="arrow" id="flipBtn">
         <i class="ri-arrow-right-s-line"></i>
       </div>
     </div>
@@ -131,7 +131,7 @@ body{margin:0;background:#f4f6f8;color:#111}
   <strong id="saldo"></strong>
 </div>
 
-<!-- LISTA (mantida igual) -->
+<!-- LISTA -->
 <div class="list">
   <div class="item"><div class="left"><i class="ri-store-2-fill"></i><div class="text"><strong id="empresaLista"></strong><small>Contato, endereço, redes sociais</small></div></div><i class="ri-arrow-right-s-line"></i></div>
   <div class="item"><div class="left"><i class="ri-qr-code-fill"></i><div class="text"><strong>QrCode</strong><small>Mostre no estabelecimento</small></div></div><i class="ri-arrow-right-s-line"></i></div>
@@ -141,33 +141,42 @@ body{margin:0;background:#f4f6f8;color:#111}
 <div class="extrato" id="extrato"></div>
 
 <script>
-function flipCard(){ card.classList.toggle('flipped') }
-
-const supabase = supabase.createClient(
+/* 🔧 SUPABASE – SEM CONFLITO */
+const sb = window.supabase.createClient(
   'https://egdjqcxikorbivkbdeap.supabase.co',
   'sb_publishable_Fy2crcrzYe2aYH9uOffyZQ_kJozEk3A'
 );
 
 const clienteId = new URLSearchParams(location.search).get("c");
-const senhaKey = "senha_"+clienteId;
+const senhaKey = "senha_" + clienteId;
 
-async function entrar(){
+/* LOGIN */
+document.getElementById("btnEntrar").addEventListener("click", () => {
+  const senha = senhaInput.value;
   if(!localStorage.getItem(senhaKey)){
-    localStorage.setItem(senhaKey, senha.value);
-  }else if(localStorage.getItem(senhaKey)!==senha.value){
+    localStorage.setItem(senhaKey, senha);
+  }else if(localStorage.getItem(senhaKey) !== senha){
     alert("Senha incorreta");
     return;
   }
-  login.style.display="none";
+  login.style.display = "none";
   carregarDados();
-}
+});
 
+/* FLIP */
+flipBtn.addEventListener("click", () => {
+  card.classList.toggle("flipped");
+});
+
+/* DADOS */
 async function carregarDados(){
-  const { data:cliente } = await supabase
+  const { data:cliente, error } = await sb
     .from("clientes")
-    .select("*,empresas(nome)")
-    .eq("id",clienteId)
+    .select("*, empresas(nome)")
+    .eq("id", clienteId)
     .single();
+
+  if(error){ alert("Cliente não encontrado"); return; }
 
   headerNome.innerText = `Olá, ${cliente.nome}!`;
   dadosCliente.innerHTML = `${cliente.nome}<br>${cliente.telefone}`;
@@ -177,22 +186,22 @@ async function carregarDados(){
   senhaResgate.innerText = cliente.senha_resgate;
   saldo.innerText = `R$ ${cliente.saldo_cashback.toFixed(2)}`;
 
-  const { data:cartao } = await supabase
+  const { data:cartao } = await sb
     .from("cartoes")
     .select("numero_cartao")
-    .eq("cliente_id",clienteId)
+    .eq("cliente_id", clienteId)
     .single();
 
   numeroCartao.innerText = cartao?.numero_cartao || "";
 
-  const { data:movs } = await supabase
+  const { data:movs } = await sb
     .from("movimentacoes_cashback")
     .select("*")
-    .eq("cliente_id",clienteId)
-    .order("created_at",{ascending:false});
+    .eq("cliente_id", clienteId)
+    .order("created_at", { ascending:false });
 
   extrato.innerHTML = "<h3>Extrato</h3>";
-  movs.forEach(m=>{
+  movs.forEach(m => {
     extrato.innerHTML += `
       <div class="mov">
         ${m.descricao}<br>
